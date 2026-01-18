@@ -363,11 +363,14 @@
                 const newActions = state.actions.filter(a => a.id !== actionId);
                 const newXp = Math.max(0, state.xp - actionToDelete.xp);
                 
-                // Si c'est une action liée au défi en cours, on pourrait décrémenter le défi, 
-                // mais pour simplifier on garde la progression visuelle actuelle 
-                // (sauf si on voulait recalculer tout l'historique).
+                // --- LOGIQUE AJOUTÉE ---
+                // Si l'action supprimée était un "goal", on décrémente la progression du défi
+                let newGoal = { ...state.weeklyGoal };
+                if (actionToDelete.type === 'goal') {
+                    newGoal.progress = Math.max(0, newGoal.progress - 1);
+                }
                 
-                const newState = { ...state, actions: newActions, xp: newXp };
+                const newState = { ...state, actions: newActions, xp: newXp, weeklyGoal: newGoal };
                 setState(newState);
                 saveToCloud(true, newState);
             };
@@ -627,6 +630,7 @@
 
             const renderCoachee = () => {
                 const progressPercent = Math.min(100, ((state.xp - currentLevel.xp) / (nextLevel.xp - currentLevel.xp)) * 100);
+                const isGoalComplete = state.weeklyGoal.progress >= state.weeklyGoal.target && state.weeklyGoal.target > 0;
 
                 return (
                     <div className="bg-slate-50 font-sans text-slate-800 pb-24 relative overflow-x-hidden animate-fade-in min-h-screen">
@@ -667,26 +671,40 @@
                                 <div className="relative z-10">
                                     <div className="flex justify-between items-center mb-3">
                                         <h2 className="text-xs uppercase tracking-wider font-bold text-slate-400 flex items-center gap-2"><Award className="w-4 h-4" /> Mission Hebdo</h2>
-                                        <span className="text-xs bg-purple-100 text-purple-700 font-bold px-2 py-1 rounded">{state.weeklyGoal.progress}/{state.weeklyGoal.target} complété</span>
+                                        {!isGoalComplete && (
+                                            <span className="text-xs bg-purple-100 text-purple-700 font-bold px-2 py-1 rounded">{state.weeklyGoal.progress}/{state.weeklyGoal.target} complété</span>
+                                        )}
                                     </div>
                                     <h3 className="text-xl font-bold text-slate-800 mb-1">{state.weeklyGoal.title}</h3>
                                     <p className="text-slate-600 text-sm mb-4">{state.weeklyGoal.description}</p>
                                     
-                                    <div className="flex items-center justify-between gap-4">
-                                        <div className="flex-1 flex gap-1 h-3">
-                                            {Array.from({length: state.weeklyGoal.target}).map((_, i) => (
-                                                <div key={i} className={`h-full flex-1 rounded-full transition-all duration-300 ${i < state.weeklyGoal.progress ? 'bg-purple-500' : 'bg-slate-200'}`}></div>
-                                            ))}
+                                    {isGoalComplete ? (
+                                        <div className="bg-green-50 border border-green-200 rounded-xl p-6 text-center animate-fade-in">
+                                            <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                                                <Check className="w-10 h-10 text-green-600" strokeWidth={3} />
+                                            </div>
+                                            <h3 className="text-xl font-bold text-green-800 mb-1">Défis validés !</h3>
+                                            <p className="text-green-600 text-sm">Tu as explosé l'objectif de la semaine.</p>
                                         </div>
-                                        <button 
-                                            onClick={openGoalValidation}
-                                            disabled={state.weeklyGoal.progress >= state.weeklyGoal.target}
-                                            className="bg-purple-600 disabled:bg-slate-300 disabled:cursor-not-allowed text-white w-12 h-12 rounded-full flex items-center justify-center shadow-md active:scale-95 transition flex-shrink-0"
-                                        >
-                                            <Plus className="w-6 h-6" />
-                                        </button>
-                                    </div>
-                                    <p className="text-[10px] text-purple-400 mt-2 text-right">Appuie sur + pour valider une étape (+10XP)</p>
+                                    ) : (
+                                        <>
+                                            <div className="flex items-center justify-between gap-4">
+                                                <div className="flex-1 flex gap-1 h-3">
+                                                    {Array.from({length: state.weeklyGoal.target}).map((_, i) => (
+                                                        <div key={i} className={`h-full flex-1 rounded-full transition-all duration-300 ${i < state.weeklyGoal.progress ? 'bg-purple-500' : 'bg-slate-200'}`}></div>
+                                                    ))}
+                                                </div>
+                                                <button 
+                                                    onClick={openGoalValidation}
+                                                    disabled={state.weeklyGoal.progress >= state.weeklyGoal.target}
+                                                    className="bg-purple-600 disabled:bg-slate-300 disabled:cursor-not-allowed text-white w-12 h-12 rounded-full flex items-center justify-center shadow-md active:scale-95 transition flex-shrink-0"
+                                                >
+                                                    <Plus className="w-6 h-6" />
+                                                </button>
+                                            </div>
+                                            <p className="text-[10px] text-purple-400 mt-2 text-right">Appuie sur + pour valider une étape (+10XP)</p>
+                                        </>
+                                    )}
                                 </div>
                             </div>
 
