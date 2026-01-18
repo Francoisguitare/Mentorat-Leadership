@@ -495,6 +495,13 @@
                 saveToCloud(true, newState);
             };
 
+            const deleteArchivedGoal = (goalId) => {
+                const newArchivedGoals = (state.archivedGoals || []).filter(g => g.id !== goalId);
+                const newState = { ...state, archivedGoals: newArchivedGoals };
+                setState(newState);
+                saveToCloud(true, newState);
+            };
+
             const deleteAction = (actionId) => {
                 const actionToDelete = state.actions.find(a => a.id === actionId);
                 if (!actionToDelete) return;
@@ -512,7 +519,7 @@
                 saveToCloud(true, newState);
             };
 
-            // Gestion "Audace Libre"
+            // Gestion "Audace Libre" - Note: La fonctionnalité est masquée mais le code logique reste pour éviter les erreurs si des données existent
             const updateNewAction = (field, value) => {
                 setState(prev => ({ ...prev, newAction: { ...prev.newAction, [field]: value } }));
             };
@@ -688,8 +695,15 @@
                                         ) : (
                                             <div className="space-y-4">
                                                 {state.archivedGoals.map(g => (
-                                                    <div key={g.id} className="border border-slate-200 p-4 rounded-xl bg-slate-50">
-                                                        <div className="flex justify-between items-start mb-2">
+                                                    <div key={g.id} className="border border-slate-200 p-4 rounded-xl bg-slate-50 relative">
+                                                        <button 
+                                                            onClick={() => deleteArchivedGoal(g.id)}
+                                                            className="absolute top-3 right-3 p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition"
+                                                            title="Supprimer l'archive"
+                                                        >
+                                                            <Trash2 className="w-4 h-4" />
+                                                        </button>
+                                                        <div className="flex justify-between items-start mb-2 pr-10">
                                                             <h4 className="font-bold text-slate-700">{g.title}</h4>
                                                             <span className="text-[10px] bg-slate-200 text-slate-600 px-2 py-1 rounded-full">{new Date(g.archivedAt).toLocaleDateString()}</span>
                                                         </div>
@@ -769,7 +783,7 @@
                 const isGoalComplete = state.weeklyGoal.progress >= state.weeklyGoal.target && state.weeklyGoal.target > 0;
 
                 return (
-                    <div className="bg-slate-50 font-sans text-slate-800 pb-24 relative overflow-x-hidden animate-fade-in min-h-screen">
+                    <div className="bg-slate-50 font-sans text-slate-800 pb-10 relative overflow-x-hidden animate-fade-in min-h-screen">
                         <StatusIndicator status={state.connectionStatus} />
                         
                         {/* Header */}
@@ -892,31 +906,6 @@
                                 </div>
                             </div>
                         </main>
-
-                        {/* Navigation simplifiée */}
-                        <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 px-6 py-3 flex justify-center items-center z-40 pb-safe shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
-                             <button onClick={() => setTab('add')} className="flex items-center gap-2 bg-indigo-600 text-white rounded-full px-6 py-3 shadow-lg shadow-indigo-200 transition active:scale-95">
-                                <Plus className="w-5 h-5 stroke-[3]" />
-                                <span className="font-bold text-sm">Audace Libre</span>
-                            </button>
-                        </nav>
-                        
-                        {/* Modale Audace Libre */}
-                        {state.activeTab === 'add' && (
-                            <ActionModal 
-                                title="Audace Libre"
-                                subtitle="Tu as fait quelque chose hors des défis ? Note-le ici !"
-                                contextValue={state.newAction.title}
-                                onContextChange={(val) => updateNewAction('title', val)}
-                                discomfortValue={state.newAction.discomfort}
-                                onDiscomfortChange={(val) => updateNewAction('discomfort', val)}
-                                feelingValue={state.newAction.feeling}
-                                onFeelingChange={(val) => updateNewAction('feeling', val)}
-                                onConfirm={submitFreeAction}
-                                onCancel={() => setTab('dashboard')}
-                                confirmText="Valider (1-10 XP)"
-                            />
-                        )}
 
                         {/* Modale Validation Défi */}
                         {state.goalValidation.isOpen && (
