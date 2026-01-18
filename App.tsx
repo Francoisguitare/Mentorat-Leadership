@@ -10,9 +10,6 @@ import {
 import { AppState, Action, WeeklyGoal } from './types';
 
 // --- CONFIGURATION FIREBASE ---
-// Note: In the original code, this was injected via window.__firebase_config.
-// We attempt to read it from window if available, otherwise we use a placeholder 
-// that will likely fail if not configured, but preserves logic flow.
 const getFirebaseConfig = () => {
     const w = window as any;
     if (w.__firebase_config) {
@@ -25,7 +22,7 @@ const getFirebaseConfig = () => {
             return {};
         }
     }
-    // Fallback/Dummy config to prevent crash if not present, though auth will fail
+    // Fallback/Dummy config
     return { apiKey: "DUMMY", authDomain: "dummy", projectId: "dummy" };
 };
 
@@ -36,11 +33,14 @@ const firebaseConfig = getFirebaseConfig();
 let auth: any;
 let db: any;
 try {
-    const app = initializeApp(firebaseConfig);
-    auth = getAuth(app);
-    db = getFirestore(app);
+    // Only init if not dummy to avoid console errors
+    if (firebaseConfig.apiKey !== "DUMMY") {
+        const app = initializeApp(firebaseConfig);
+        auth = getAuth(app);
+        db = getFirestore(app);
+    }
 } catch (e) {
-    console.warn("Firebase init failed (expected if config missing)", e);
+    console.warn("Firebase init failed", e);
 }
 
 // --- CONSTANTS & HELPERS ---
@@ -122,10 +122,28 @@ export default function App() {
     const [state, setState] = useState<AppState>(defaultState);
     const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-    // --- FIREBASE LOGIC ---
+    // --- FIREBASE & LOCAL STORAGE LOGIC ---
     useEffect(() => {
+        // Fallback LocalStorage si pas de config Firebase valide
         if (!auth || !db) {
-            setState(prev => ({ ...prev, connectionStatus: 'error' }));
+            console.log("Mode LocalStorage activé (Firebase non configuré)");
+            const localData = localStorage.getItem(`audacieuse_${appId}`);
+            if (localData) {
+                try {
+                    const parsed = JSON.parse(localData);
+                    setState(prev => ({
+                        ...prev,
+                        ...parsed,
+                        currentView: prev.currentView,
+                        activeTab: prev.activeTab,
+                        connectionStatus: 'connected'
+                    }));
+                } catch (e) {
+                    console.error("Erreur lecture locale", e);
+                }
+            } else {
+                setState(prev => ({ ...prev, connectionStatus: 'connected' }));
+            }
             return;
         }
 
@@ -140,13 +158,11 @@ export default function App() {
                         setState(prev => ({
                             ...prev,
                             ...remoteData,
-                            // Preserve UI state
                             currentView: prev.currentView,
                             activeTab: prev.activeTab,
                             connectionStatus: 'connected'
                         }));
                     } else {
-                        // First launch, force save default state
                         saveToCloud(true);
                     }
                 }, (error) => {
@@ -166,8 +182,6 @@ export default function App() {
     }, []);
 
     const saveToCloud = async (force = false, stateOverride?: Partial<AppState>) => {
-        if (!auth || !auth.currentUser) return;
-
         const currentState = stateOverride ? { ...state, ...stateOverride } : state;
         
         setState(prev => ({ ...prev, connectionStatus: 'saving' }));
@@ -180,8 +194,24 @@ export default function App() {
             weeklyGoal: currentState.weeklyGoal
         };
 
-        const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'mentorship_shared_v1', 'main');
+        // Sauvegarde LocalStorage si pas de Firebase
+        if (!auth || !db) {
+             if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+             
+             const doSave = () => {
+                 localStorage.setItem(`audacieuse_${appId}`, JSON.stringify(dataToSave));
+                 setState(prev => ({ ...prev, connectionStatus: 'connected' }));
+             };
 
+             if (force) doSave();
+             else {
+                 saveTimeoutRef.current = setTimeout(doSave, 1000);
+             }
+             return;
+        }
+
+        // Sauvegarde Firebase
+        const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'mentorship_shared_v1', 'main');
         try {
             if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
 
