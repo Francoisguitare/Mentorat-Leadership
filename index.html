@@ -115,36 +115,36 @@
 
         // --- NIVEAUX ---
         const LEVELS = [
-            { level: 1, xp: 0, title: "L'Observatrice" },
-            { level: 2, xp: 100, title: "L'Initiée" },
-            { level: 3, xp: 150, title: "L'Audacieuse" },
-            { level: 4, xp: 200, title: "La Participante" },
-            { level: 5, xp: 300, title: "La Personne Cool" },
-            { level: 6, xp: 450, title: "L'Alliée Précieuse" },
-            { level: 7, xp: 600, title: "La Force Tranquille" },
-            { level: 8, xp: 800, title: "L'Interlocutrice Captivante" },
-            { level: 9, xp: 1000, title: "L'Aimant Social" },
-            { level: 10, xp: 1250, title: "La Personne Intéressante" },
-            { level: 11, xp: 1600, title: "L'Authentique" },
-            { level: 12, xp: 2000, title: "La Confidente" },
-            { level: 13, xp: 2500, title: "L'Éclaireuse" },
-            { level: 14, xp: 3100, title: "Le Pilier" },
-            { level: 15, xp: 3800, title: "L'Influenceuse Positive" },
-            { level: 16, xp: 4600, title: "La Diplomate" },
-            { level: 17, xp: 5500, title: "La Charismatique" },
-            { level: 18, xp: 6500, title: "La Virtuose du Lien" },
-            { level: 19, xp: 8000, title: "L'Inspiratrice" },
-            { level: 20, xp: 10000, title: "Leader Accomplie" }
+            { level: 1, xp: 0, title: "L'Observatrice", description: "Tu analyses ton environnement avec finesse. C'est la base de toute stratégie sociale." },
+            { level: 2, xp: 100, title: "L'Initiée", description: "Tu as osé faire le premier pas. La machine est lancée, tes efforts commencent à payer." },
+            { level: 3, xp: 150, title: "L'Audacieuse", description: "Tu sors régulièrement de ta zone de confort. L'inconnu ne te fait plus peur." },
+            { level: 4, xp: 200, title: "La Participante", description: "Tu ne fais plus que regarder, tu es actrice de tes interactions. Bravo !" },
+            { level: 5, xp: 300, title: "La Personne Cool", description: "Ta présence est agréable et recherchée. Tu dégages une énergie positive." },
+            { level: 6, xp: 450, title: "L'Alliée Précieuse", description: "On commence à compter sur toi. Ton soutien est remarqué et apprécié." },
+            { level: 7, xp: 600, title: "La Force Tranquille", description: "Tu inspires confiance par ton calme et ta maîtrise. Tu deviens un roc." },
+            { level: 8, xp: 800, title: "L'Interlocutrice Captivante", description: "Tes conversations marquent les esprits. On aime t'écouter et échanger avec toi." },
+            { level: 9, xp: 1000, title: "L'Aimant Social", description: "Tu attires naturellement les autres vers toi. Le lien se crée sans effort." },
+            { level: 10, xp: 1250, title: "La Personne Intéressante", description: "Tu as des choses à dire et une perspective unique. Ton avis compte." },
+            { level: 11, xp: 1600, title: "L'Authentique", description: "Tu ne joues plus de rôle. Ta sincérité est ta plus grande force." },
+            { level: 12, xp: 2000, title: "La Confidente", description: "On te confie des secrets. Tu as développé une écoute et une empathie rares." },
+            { level: 13, xp: 2500, title: "L'Éclaireuse", description: "Tu ouvres la voie aux autres. Tes actions guident et rassurent." },
+            { level: 14, xp: 3100, title: "Le Pilier", description: "Tu es indispensable à l'équilibre du groupe. Ta solidité est légendaire." },
+            { level: 15, xp: 3800, title: "L'Influenceuse Positive", description: "Tes mots et tes actes changent les choses en bien autour de toi." },
+            { level: 16, xp: 4600, title: "La Diplomate", description: "Tu sais naviguer dans les eaux troubles avec grâce et résoudre les conflits." },
+            { level: 17, xp: 5500, title: "La Charismatique", description: "Tu as cette aura indéfinissable qui fascine. Tu rayonnes." },
+            { level: 18, xp: 6500, title: "La Virtuose du Lien", description: "Créer des connexions est devenu pour toi un art que tu maîtrises à la perfection." },
+            { level: 19, xp: 8000, title: "L'Inspiratrice", description: "Tu donnes aux autres l'envie de se dépasser simplement en étant toi-même." },
+            { level: 20, xp: 10000, title: "Leader Accomplie", description: "Tu as atteint les sommets. Ton parcours est un modèle de transformation et de puissance." }
         ];
 
         const getLevelInfo = (xp) => {
             let current = LEVELS[0];
-            let next = LEVELS[1] || { xp: 100000, title: "Légende" };
+            let next = LEVELS[1] || { xp: 100000, title: "Légende", description: "Au-delà des mots." };
             
             for (let i = 0; i < LEVELS.length; i++) {
                 if (xp >= LEVELS[i].xp) {
                     current = LEVELS[i];
-                    next = LEVELS[i+1] || { xp: xp * 1.5, title: "Légende" };
+                    next = LEVELS[i+1] || { xp: xp * 1.5, title: "Légende", description: "Au-delà des mots." };
                 }
             }
             return { current, next };
@@ -200,7 +200,7 @@
         };
 
         const ActionModal = ({ title, subtitle, contextValue, onContextChange, discomfortValue, onDiscomfortChange, feelingValue, onFeelingChange, onConfirm, onCancel, confirmText }) => (
-            <div className="fixed inset-0 z-50 bg-slate-900/80 backdrop-blur-sm flex items-end sm:items-center justify-center p-4 animate-fade-in">
+            <div className="fixed inset-0 z-50 bg-slate-900/80 backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in">
             <div className="bg-white w-full max-w-md rounded-2xl p-6 shadow-2xl">
                 <h2 className="text-xl font-bold mb-2 text-center">{title}</h2>
                 {subtitle && <p className="text-slate-500 text-sm text-center mb-6">{subtitle}</p>}
@@ -326,6 +326,11 @@
             const saveTimeoutRef = useRef(null);
 
             const { current: currentLevel, next: nextLevel } = getLevelInfo(state.xp);
+
+            // Scroll reset on view change
+            useEffect(() => {
+                window.scrollTo(0, 0);
+            }, [state.currentView]);
 
             useEffect(() => {
                 const processData = (data) => {
@@ -866,7 +871,7 @@
                                 </div>
                             </div>
                             <div className="relative z-10">
-                                <div className="flex justify-between text-xs mb-1 text-indigo-200"><span>XP: {state.xp}</span><span>Objectif: {nextLevel.title} ({nextLevel.xp} XP)</span></div>
+                                <div className="flex justify-between text-xs mb-1 text-indigo-200"><span>XP: {state.xp}</span><span>Objectif: ??? ({nextLevel.xp} XP)</span></div>
                                 <div className="w-full bg-indigo-900 rounded-full h-3 overflow-hidden shadow-inner">
                                     <div className="bg-gradient-to-r from-yellow-400 to-yellow-200 h-full rounded-full transition-all duration-1000" style={{ width: `${progressPercent}%` }}></div>
                                 </div>
@@ -1011,18 +1016,24 @@
                                         {LEVELS.map(l => {
                                             const isCurrent = currentLevel.level === l.level;
                                             const isPassed = currentLevel.level > l.level;
+                                            const isLocked = !isCurrent && !isPassed;
+
                                             return (
                                                 <div key={l.level} className={`flex items-center justify-between p-3 rounded-xl border ${isCurrent ? 'bg-indigo-50 border-indigo-500 ring-1 ring-indigo-500' : 'bg-white border-slate-100'} ${isPassed ? 'opacity-60' : ''}`}>
                                                     <div className="flex items-center gap-3">
-                                                        <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs ${isCurrent ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-500'}`}>
+                                                        <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs flex-shrink-0 ${isCurrent ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-500'}`}>
                                                             {l.level}
                                                         </div>
                                                         <div>
-                                                            <div className={`font-bold ${isCurrent ? 'text-indigo-900' : 'text-slate-700'}`}>{l.title}</div>
-                                                            <div className="text-[10px] text-slate-400 font-bold uppercase">Objectif XP</div>
+                                                            <div className={`font-bold ${isCurrent ? 'text-indigo-900' : 'text-slate-700'}`}>
+                                                                {isLocked ? "???" : l.title}
+                                                            </div>
+                                                            <div className="text-[10px] text-slate-500 font-medium leading-tight mt-0.5">
+                                                                {isLocked ? "Continue tes efforts pour dévoiler ce rang..." : l.description}
+                                                            </div>
                                                         </div>
                                                     </div>
-                                                    <div className="font-mono font-bold text-slate-500">
+                                                    <div className="font-mono font-bold text-slate-400 text-xs ml-2">
                                                         {l.xp}
                                                     </div>
                                                 </div>
