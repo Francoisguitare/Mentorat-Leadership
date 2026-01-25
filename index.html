@@ -68,37 +68,90 @@
             Zap, Lock, ArrowLeft, Delete, Award, Edit3, Check, 
             Trophy, Star, User, Flame, TrendingUp, Plus, Calendar,
             X, BarChart3, Trash2, MessageSquare, Archive, MoreHorizontal, Info, Gauge as GaugeIcon,
-            Settings, ArrowUp, ArrowDown, Crown, Target
+            Settings, ArrowUp, ArrowDown, Crown, Target, AlertTriangle, WifiOff, Database, Save, LogOut
         } from 'lucide-react';
+
+        // --- SAFE STORAGE (Fix crash navigation privée) ---
+        const safeStorage = {
+            get: (key) => {
+                try {
+                    return localStorage.getItem(key);
+                } catch (e) {
+                    console.warn("LocalStorage blocked (private mode?)", e);
+                    return null;
+                }
+            },
+            set: (key, value) => {
+                try {
+                    localStorage.setItem(key, value);
+                } catch (e) {
+                    console.warn("LocalStorage blocked (private mode?)", e);
+                }
+            },
+            remove: (key) => {
+                try {
+                    localStorage.removeItem(key);
+                } catch (e) {
+                    console.warn("LocalStorage blocked", e);
+                }
+            }
+        };
 
         // --- CONFIGURATION ---
         const getFirebaseConfig = () => {
             const w = window;
+            
+            // 1. Injection via l'hôte (ex: Google AI Studio) - Priorité 1
             if (w.__firebase_config) {
                 try {
                     return typeof w.__firebase_config === 'string' 
                         ? JSON.parse(w.__firebase_config) 
                         : w.__firebase_config;
-                } catch (e) {
-                    return {};
-                }
+                } catch (e) { return {}; }
             }
-            return { apiKey: "DUMMY", authDomain: "dummy", projectId: "dummy" };
+            
+            // 2. Configuration sauvegardée localement - Priorité 2
+            const savedConfig = safeStorage.get('app_firebase_config_v1');
+            if (savedConfig) {
+                try {
+                    return JSON.parse(savedConfig);
+                } catch (e) { return {}; }
+            }
+
+            // 3. Configuration par défaut (Celle fournie) - Priorité 3
+            return {
+                apiKey: "AIzaSyASgZLSF2gF0hfDsQKwdkERtThnwDsEKKU",
+                authDomain: "mentorat-leadership.firebaseapp.com",
+                projectId: "mentorat-leadership",
+                storageBucket: "mentorat-leadership.firebasestorage.app",
+                messagingSenderId: "15085165408",
+                appId: "1:15085165408:web:ee2d72104692de76af9c05"
+            };
         };
 
         const appId = window.__app_id || 'audacieuse-app-default';
         const firebaseConfig = getFirebaseConfig();
+        
+        // Est considéré comme "Configuré" si l'API Key n'est pas DUMMY
+        const isConfigured = firebaseConfig.apiKey && firebaseConfig.apiKey !== "DUMMY";
 
         let auth;
         let db;
+        
+        // Initialisation Firebase uniquement si une config valide existe
         try {
-            if (firebaseConfig.apiKey !== "DUMMY") {
+            if (isConfigured) {
+                // Vérification basique pour éviter crash si config incomplète
+                if (!firebaseConfig.projectId) throw new Error("ProjectId missing");
+                
                 const app = initializeApp(firebaseConfig);
                 auth = getAuth(app);
                 db = getFirestore(app);
+                console.log("Firebase initialized successfully");
             }
         } catch (e) {
-            console.warn("Firebase init failed", e);
+            console.warn("Firebase init failed (Invalid Config)", e);
+            // On retombe en mode non configuré si l'init échoue
         }
 
         // --- HELPERS DATE ---
@@ -206,6 +259,15 @@
         // --- COMPOSANTS UI STABLES ---
 
         const StatusIndicator = ({ status }) => {
+            if (!isConfigured) {
+                 return (
+                    <div className="fixed top-2 right-2 z-50 flex items-center gap-1 bg-red-100/90 backdrop-blur px-2 py-1 rounded-full text-[10px] text-red-600 border border-red-200 font-bold">
+                        <WifiOff className="w-3 h-3" />
+                        <span>Non Connecté</span>
+                    </div>
+                );
+            }
+
             let colorClass = 'bg-yellow-400';
             let pulse = '';
             if (status === 'connected') { colorClass = 'bg-green-500'; } 
@@ -219,6 +281,7 @@
             );
         };
 
+        // (Le reste des composants UI : LeadershipGauge, ActionModal, SimpleChart restent identiques)
         const LeadershipGauge = ({ score, minScore }) => {
             const radius = 80;
             const stroke = 15;
@@ -230,7 +293,6 @@
             const x = 100 + needleLen * Math.cos(needleAngleRad);
             const y = 100 + needleLen * Math.sin(needleAngleRad);
 
-            // Définition des paliers
             const tiers = [
                 { min: 0, max: 5, icon: Target, label: "Démarrage", color: "text-slate-500", bg: "bg-slate-100", border: "border-slate-200", shadow: "shadow-slate-200" },
                 { min: 6, max: 15, icon: Zap, label: "Élan", color: "text-indigo-600", bg: "bg-indigo-50", border: "border-indigo-200", shadow: "shadow-indigo-200" },
@@ -238,7 +300,6 @@
                 { min: 26, max: 30, icon: Crown, label: "Leader", color: "text-yellow-600", bg: "bg-yellow-50", border: "border-yellow-200", shadow: "shadow-yellow-200" }
             ];
 
-            // Trouver le palier actif
             let activeIndex = 0;
             if (score > 5) activeIndex = 1;
             if (score > 15) activeIndex = 2;
@@ -246,7 +307,6 @@
 
             return (
                 <div className="flex flex-col items-center justify-center -mt-6">
-                    {/* JAUGE SVG */}
                     <div className="relative w-[200px] h-[110px] overflow-hidden">
                         <svg viewBox="0 0 200 110" className="w-full h-full">
                             <defs>
@@ -271,18 +331,13 @@
                             )}
                         </svg>
                     </div>
-
-                    {/* SCORE NUMERIQUE (Déplacé ici) */}
                     <div className="text-center -mt-3 mb-6 relative z-10">
                         <div className="text-3xl font-black text-slate-800 leading-none tracking-tight">{Math.floor(score)}<span className="text-lg text-slate-400 font-medium ml-1">/30</span></div>
                     </div>
-
-                    {/* BADGES NIVEAUX */}
                     <div className="flex justify-between w-full px-2 gap-2">
                         {tiers.map((tier, index) => {
                             const isActive = index === activeIndex;
                             const Icon = tier.icon;
-                            
                             return (
                                 <div key={index} className={`flex flex-col items-center transition-all duration-500 ${isActive ? 'scale-110 z-10' : 'scale-90 opacity-40 grayscale blur-[0.5px]'}`}>
                                     <div className={`w-10 h-10 rounded-xl flex items-center justify-center border-2 mb-1 transition-all duration-300 ${isActive ? `${tier.bg} ${tier.border} ${tier.color} shadow-lg ring-2 ring-offset-2 ring-indigo-50/50` : 'bg-slate-50 border-slate-100 text-slate-400'}`}>
@@ -295,7 +350,6 @@
                             );
                         })}
                     </div>
-
                     {minScore > 0 && (
                         <div className="text-[10px] text-slate-400 mt-4 flex items-center gap-1 bg-slate-50 px-2 py-1 rounded-full border border-slate-100">
                             <Lock className="w-3 h-3" /> Min garanti: {minScore}
@@ -357,10 +411,8 @@
             const currentMonth = today.getMonth();
             const currentYear = today.getFullYear();
             const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
-            
             const monthData = Array(daysInMonth).fill(0);
             let totalXpMonth = 0;
-
             actions.forEach(a => {
                 if (!a.date) return;
                 const [y, m, d] = a.date.split('-').map(Number);
@@ -369,45 +421,24 @@
                     totalXpMonth += a.xp;
                 }
             });
-
             const maxVal = Math.max(...monthData, 30);
-
             return (
                 <div className="w-full select-none">
                     <div className="flex justify-between items-baseline mb-4 px-1">
-                        <h3 className="text-sm font-bold text-slate-500 uppercase tracking-wider">
-                            {today.toLocaleDateString('fr-FR', { month: 'long' })}
-                        </h3>
-                        <div className="flex items-baseline gap-1">
-                            <span className="text-2xl font-black text-indigo-600 tracking-tight">+{totalXpMonth}</span>
-                            <span className="text-xs font-bold text-indigo-400">XP</span>
-                        </div>
+                        <h3 className="text-sm font-bold text-slate-500 uppercase tracking-wider">{today.toLocaleDateString('fr-FR', { month: 'long' })}</h3>
+                        <div className="flex items-baseline gap-1"><span className="text-2xl font-black text-indigo-600 tracking-tight">+{totalXpMonth}</span><span className="text-xs font-bold text-indigo-400">XP</span></div>
                     </div>
-                    
                     <div className="relative h-32 flex items-end justify-between gap-[3px] group/chart">
                         {monthData.map((val, i) => {
                             const dayNum = i + 1;
                             const isToday = dayNum === today.getDate();
                             const hasData = val > 0;
-                            
                             let height = 6; 
-                            if (hasData) {
-                                height = Math.max((val / maxVal) * 100, 15);
-                            }
-                            
+                            if (hasData) { height = Math.max((val / maxVal) * 100, 15); }
                             return (
                                 <div key={i} className="flex-1 h-full flex flex-col justify-end relative group/bar">
-                                    <div 
-                                        className={`w-full rounded-t-[3px] transition-all duration-700 ease-out relative
-                                            ${hasData ? 'bg-indigo-500' : 'bg-slate-100'}
-                                            ${isToday && !hasData ? 'bg-indigo-200' : ''}
-                                            ${isToday && hasData ? 'bg-indigo-600 shadow-[0_0_15px_rgba(79,70,229,0.4)] ring-[1px] ring-indigo-300 ring-offset-1 ring-offset-white z-10' : ''}
-                                        `}
-                                        style={{ height: `${height}%` }}
-                                    >
-                                        {hasData && (
-                                             <div className="absolute bottom-0 left-0 w-full h-full bg-gradient-to-t from-black/10 to-transparent pointer-events-none"></div>
-                                        )}
+                                    <div className={`w-full rounded-t-[3px] transition-all duration-700 ease-out relative ${hasData ? 'bg-indigo-500' : 'bg-slate-100'} ${isToday && !hasData ? 'bg-indigo-200' : ''} ${isToday && hasData ? 'bg-indigo-600 shadow-[0_0_15px_rgba(79,70,229,0.4)] ring-[1px] ring-indigo-300 ring-offset-1 ring-offset-white z-10' : ''}`} style={{ height: `${height}%` }}>
+                                        {hasData && (<div className="absolute bottom-0 left-0 w-full h-full bg-gradient-to-t from-black/10 to-transparent pointer-events-none"></div>)}
                                     </div>
                                 </div>
                             );
@@ -420,14 +451,21 @@
         // --- COMPOSANT APP ---
         function App() {
             const [state, setState] = useState(defaultState);
+            const [configInput, setConfigInput] = useState('');
+            const [configError, setConfigError] = useState('');
             const saveTimeoutRef = useRef(null);
 
             const { current: currentLevel, next: nextLevel } = getLevelInfo(state.xp);
 
-            // Scroll reset on view change
+            // Rediriger vers l'écran de config si non configuré
             useEffect(() => {
-                window.scrollTo(0, 0);
-            }, [state.currentView]);
+                if (!isConfigured) {
+                    setState(prev => ({ ...prev, currentView: 'setup_firebase' }));
+                }
+            }, []);
+
+            // Scroll reset
+            useEffect(() => { window.scrollTo(0, 0); }, [state.currentView]);
 
             // --- LOGIQUE DECAY LEADERSHIP ---
             const applyLeadershipDecay = (data) => {
@@ -445,68 +483,42 @@
                         const currentXp = data.xp || 0;
                         const { current } = getLevelInfo(currentXp);
                         const floor = current.level * config.floorMultiplier; 
-                        
                         const loss = diffDays * config.decayPerDay;
                         let newScore = score - loss;
                         score = Math.max(newScore, floor);
                     }
                 }
-
-                // Auto-bump if floor is higher than score
                 const currentXp = data.xp || 0;
                 const { current } = getLevelInfo(currentXp);
                 const floor = current.level * config.floorMultiplier;
-                if (score < floor) {
-                    score = floor;
-                }
+                if (score < floor) { score = floor; }
 
-                return {
-                    ...data,
-                    gaugeConfig: config,
-                    leadershipScore: score,
-                    lastActivityDate: today
-                };
+                return { ...data, gaugeConfig: config, leadershipScore: score, lastActivityDate: today };
             };
 
             useEffect(() => {
                 const processData = (data) => {
                     let activeGoals = data.activeGoals || [];
                     if (activeGoals.length === 0 && data.weeklyGoal && data.weeklyGoal.title !== "En attente du Mentor...") {
-                        activeGoals.push({
-                            ...data.weeklyGoal,
-                            id: Date.now()
-                        });
+                        activeGoals.push({ ...data.weeklyGoal, id: Date.now() });
                     }
-
                     const decayProcessedData = applyLeadershipDecay(data);
-
-                    return {
-                        ...decayProcessedData,
-                        activeGoals: activeGoals,
-                        archivedGoals: data.archivedGoals || []
-                    };
+                    return { ...decayProcessedData, activeGoals: activeGoals, archivedGoals: data.archivedGoals || [] };
                 };
 
+                // Si pas connecté, on utilise le stockage local ou les valeurs par défaut
                 if (!auth || !db) {
-                    const localData = localStorage.getItem(`audacieuse_${appId}`);
+                    const localData = safeStorage.get(`audacieuse_${appId}`);
                     if (localData) {
                         try {
                             const parsed = JSON.parse(localData);
                             const processed = processData(parsed);
                             if (processed.leadershipScore !== parsed.leadershipScore || processed.lastActivityDate !== parsed.lastActivityDate) {
-                                localStorage.setItem(`audacieuse_${appId}`, JSON.stringify(processed));
+                                safeStorage.set(`audacieuse_${appId}`, JSON.stringify(processed));
                             }
-                            
-                            setState(prev => ({
-                                ...prev,
-                                ...processed,
-                                currentView: prev.currentView,
-                                activeTab: prev.activeTab,
-                                connectionStatus: 'connected'
-                            }));
+                            setState(prev => ({ ...prev, ...processed, connectionStatus: 'connected' }));
                         } catch (e) { console.error(e); }
                     } else {
-                        // SI pas de données locales, on utilise defaultState QUI CONTIENT UNE MISSION PAR DEFAUT
                         const processed = applyLeadershipDecay(defaultState);
                         setState(prev => ({ ...prev, ...processed, connectionStatus: 'connected' }));
                     }
@@ -522,13 +534,7 @@
                             if (docSnap.exists()) {
                                 const data = docSnap.data();
                                 const processed = processData(data);
-                                setState(prev => ({
-                                    ...prev,
-                                    ...processed,
-                                    currentView: prev.currentView,
-                                    activeTab: prev.activeTab,
-                                    connectionStatus: 'connected'
-                                }));
+                                setState(prev => ({ ...prev, ...processed, currentView: prev.currentView === 'setup_firebase' ? 'selection' : prev.currentView, connectionStatus: 'connected' }));
                             } else {
                                 saveToCloud(true);
                             }
@@ -563,7 +569,7 @@
                 if (!auth || !db) {
                     if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
                     const doSave = () => {
-                        localStorage.setItem(`audacieuse_${appId}`, JSON.stringify(dataToSave));
+                        safeStorage.set(`audacieuse_${appId}`, JSON.stringify(dataToSave));
                         setState(prev => ({ ...prev, connectionStatus: 'connected' }));
                     };
                     if (force) doSave();
@@ -608,243 +614,96 @@
             };
             
             const clearPin = () => setState(prev => ({ ...prev, pinInput: '', pinError: false }));
-            
-            // --- GESTION DES PARAMETRES JAUGE ---
             const updateGaugeConfig = (field, value) => {
                 const numValue = parseFloat(value);
-                const newState = {
-                    ...state,
-                    gaugeConfig: {
-                        ...state.gaugeConfig,
-                        [field]: isNaN(numValue) ? 0 : numValue
-                    }
-                };
+                const newState = { ...state, gaugeConfig: { ...state.gaugeConfig, [field]: isNaN(numValue) ? 0 : numValue } };
                 setState(newState);
                 saveToCloud(false, newState);
             };
-
-            // --- GESTION DES OBJECTIFS (NOUVEAU) ---
-
-            const openNewGoal = () => {
-                setState(prev => ({
-                    ...prev,
-                    isEditingGoal: true,
-                    tempGoal: { title: '', description: '', target: 1 }
-                }));
-            };
-
-            const openEditGoal = (goal) => {
-                setState(prev => ({
-                    ...prev,
-                    isEditingGoal: true,
-                    tempGoal: { ...goal }
-                }));
-            };
-
-            const updateTempGoal = (field, value) => {
-                setState(prev => ({ ...prev, tempGoal: { ...prev.tempGoal, [field]: value } }));
-            };
-
+            const openNewGoal = () => { setState(prev => ({ ...prev, isEditingGoal: true, tempGoal: { title: '', description: '', target: 1 } })); };
+            const openEditGoal = (goal) => { setState(prev => ({ ...prev, isEditingGoal: true, tempGoal: { ...goal } })); };
+            const updateTempGoal = (field, value) => { setState(prev => ({ ...prev, tempGoal: { ...prev.tempGoal, [field]: value } })); };
             const saveGoal = () => {
                 let newActiveGoals = [...state.activeGoals];
-                
-                if (state.tempGoal.id) {
-                    newActiveGoals = newActiveGoals.map(g => 
-                        g.id === state.tempGoal.id ? { ...g, ...state.tempGoal } : g
-                    );
-                } else {
-                    newActiveGoals.unshift({
-                        ...state.tempGoal,
-                        id: Date.now(),
-                        progress: 0,
-                        target: state.tempGoal.target || 1
-                    });
-                }
-                
+                if (state.tempGoal.id) { newActiveGoals = newActiveGoals.map(g => g.id === state.tempGoal.id ? { ...g, ...state.tempGoal } : g); } else { newActiveGoals.unshift({ ...state.tempGoal, id: Date.now(), progress: 0, target: state.tempGoal.target || 1 }); }
                 const newState = { ...state, activeGoals: newActiveGoals, isEditingGoal: false };
                 setState(newState);
                 saveToCloud(true, newState);
             };
-
             const moveGoal = (index, direction) => {
                 const newGoals = [...state.activeGoals];
-                if (direction === 'up' && index > 0) {
-                    [newGoals[index], newGoals[index - 1]] = [newGoals[index - 1], newGoals[index]];
-                } else if (direction === 'down' && index < newGoals.length - 1) {
-                    [newGoals[index], newGoals[index + 1]] = [newGoals[index + 1], newGoals[index]];
-                }
+                if (direction === 'up' && index > 0) { [newGoals[index], newGoals[index - 1]] = [newGoals[index - 1], newGoals[index]]; } 
+                else if (direction === 'down' && index < newGoals.length - 1) { [newGoals[index], newGoals[index + 1]] = [newGoals[index + 1], newGoals[index]]; }
                 const newState = { ...state, activeGoals: newGoals };
                 setState(newState);
                 saveToCloud(true, newState);
             };
-
-            const cancelEditGoal = () => {
-                setState(prev => ({ ...prev, isEditingGoal: false, tempGoal: {} }));
-            };
-
+            const cancelEditGoal = () => { setState(prev => ({ ...prev, isEditingGoal: false, tempGoal: {} })); };
             const archiveGoal = (goalId) => {
                 const goalToArchive = state.activeGoals.find(g => g.id === goalId);
                 if (!goalToArchive) return;
-
                 const archived = { ...goalToArchive, archivedAt: new Date().toISOString() };
                 const newActiveGoals = state.activeGoals.filter(g => g.id !== goalId);
                 const newArchivedGoals = [archived, ...(state.archivedGoals || [])];
-
-                const newState = {
-                    ...state,
-                    activeGoals: newActiveGoals,
-                    archivedGoals: newArchivedGoals
-                };
-                
+                const newState = { ...state, activeGoals: newActiveGoals, archivedGoals: newArchivedGoals };
                 setState(newState);
                 saveToCloud(true, newState);
             };
-
             const deleteArchivedGoal = (goalId) => {
                 const newArchivedGoals = (state.archivedGoals || []).filter(g => g.id !== goalId);
                 const newState = { ...state, archivedGoals: newArchivedGoals };
                 setState(newState);
                 saveToCloud(true, newState);
             };
-
             const deleteAction = (actionId) => {
                 const actionToDelete = state.actions.find(a => a.id === actionId);
                 if (!actionToDelete) return;
-
                 const newActions = state.actions.filter(a => a.id !== actionId);
                 const newXp = Math.max(0, state.xp - actionToDelete.xp);
-                
                 const newState = { ...state, actions: newActions, xp: newXp };
                 setState(newState);
                 saveToCloud(true, newState);
             };
-
-            const updateNewAction = (field, value) => {
-                setState(prev => ({ ...prev, newAction: { ...prev.newAction, [field]: value } }));
-            };
-
+            const updateNewAction = (field, value) => { setState(prev => ({ ...prev, newAction: { ...prev.newAction, [field]: value } })); };
             const submitFreeAction = () => {
                 const discomfortPoints = parseInt(state.newAction.discomfort);
-                const newEntry = {
-                    id: Date.now(),
-                    title: state.newAction.title,
-                    discomfort: discomfortPoints,
-                    feeling: state.newAction.feeling,
-                    date: getTodayString(),
-                    xp: discomfortPoints,
-                    type: 'free'
-                };
+                const newEntry = { id: Date.now(), title: state.newAction.title, discomfort: discomfortPoints, feeling: state.newAction.feeling, date: getTodayString(), xp: discomfortPoints, type: 'free' };
                 const newActions = [newEntry, ...state.actions];
                 const newXp = state.xp + discomfortPoints;
-
-                // Gauge Logic with Config
                 const config = state.gaugeConfig || defaultGaugeConfig;
                 let newLeadershipScore = state.leadershipScore + config.gainPerTask;
-
-                // Daily Bonus Logic
                 const today = getTodayString();
                 const todayActionsCount = newActions.filter(a => a.date === today).length;
-                let bonusMsg = "";
-                if (todayActionsCount === config.bonusThreshold) {
-                    newLeadershipScore += config.bonusAmount;
-                    bonusMsg = ` (+${config.bonusAmount} bonus combo!)`;
-                }
-                
+                if (todayActionsCount === config.bonusThreshold) { newLeadershipScore += config.bonusAmount; }
                 newLeadershipScore = Math.min(30, newLeadershipScore);
-
-                const newState = {
-                    ...state,
-                    actions: newActions,
-                    xp: newXp,
-                    leadershipScore: newLeadershipScore,
-                    newAction: { title: '', discomfort: 5, feeling: 'neutral' },
-                    activeTab: 'dashboard',
-                    showConfetti: true
-                };
+                const newState = { ...state, actions: newActions, xp: newXp, leadershipScore: newLeadershipScore, newAction: { title: '', discomfort: 5, feeling: 'neutral' }, activeTab: 'dashboard', showConfetti: true };
                 setState(newState);
                 saveToCloud(true, newState);
                 setTimeout(() => setState(prev => ({ ...prev, showConfetti: false })), 2500);
             };
-
-            // Gestion "Validation Défi Hebdo"
-            const openGoalValidation = (goalId) => {
-                setState(prev => ({ 
-                    ...prev, 
-                    goalValidation: { targetGoalId: goalId, isOpen: true, context: '', discomfort: 5, feeling: 'neutral' } 
-                }));
-            };
-            
-            const closeGoalValidation = () => {
-                setState(prev => ({ 
-                    ...prev, 
-                    goalValidation: { ...prev.goalValidation, isOpen: false } 
-                }));
-            };
-
-            const updateGoalValidation = (field, value) => {
-                setState(prev => ({
-                    ...prev,
-                    goalValidation: { ...prev.goalValidation, [field]: value }
-                }));
-            };
-
+            const openGoalValidation = (goalId) => { setState(prev => ({ ...prev, goalValidation: { targetGoalId: goalId, isOpen: true, context: '', discomfort: 5, feeling: 'neutral' } })); };
+            const closeGoalValidation = () => { setState(prev => ({ ...prev, goalValidation: { ...prev.goalValidation, isOpen: false } })); };
+            const updateGoalValidation = (field, value) => { setState(prev => ({ ...prev, goalValidation: { ...prev.goalValidation, [field]: value } })); };
             const confirmGoalIncrement = () => {
                 const targetId = state.goalValidation.targetGoalId;
                 const targetGoal = state.activeGoals.find(g => g.id === targetId);
-
-                if (!targetGoal) return;
-                if (targetGoal.progress >= targetGoal.target) return;
-
+                if (!targetGoal || targetGoal.progress >= targetGoal.target) return;
                 const newProgress = targetGoal.progress + 1;
                 const isComplete = newProgress === targetGoal.target;
-                
                 let gainedXp = 10;
                 let bonusXp = 0;
                 if (isComplete) bonusXp = 50;
-
                 const totalGain = gainedXp + bonusXp;
-
-                const goalAction = {
-                    id: Date.now(),
-                    title: `Défi: ${state.goalValidation.context || 'Validation'}`,
-                    description: targetGoal.title,
-                    discomfort: parseInt(state.goalValidation.discomfort),
-                    feeling: state.goalValidation.feeling,
-                    date: getTodayString(),
-                    xp: totalGain,
-                    type: 'goal',
-                    goalId: targetId
-                };
-
-                const newActiveGoals = state.activeGoals.map(g => 
-                    g.id === targetId ? { ...g, progress: newProgress } : g
-                );
-                
+                const goalAction = { id: Date.now(), title: `Défi: ${state.goalValidation.context || 'Validation'}`, description: targetGoal.title, discomfort: parseInt(state.goalValidation.discomfort), feeling: state.goalValidation.feeling, date: getTodayString(), xp: totalGain, type: 'goal', goalId: targetId };
+                const newActiveGoals = state.activeGoals.map(g => g.id === targetId ? { ...g, progress: newProgress } : g);
                 const newActions = [goalAction, ...state.actions];
-
-                // Gauge Logic with Config
                 const config = state.gaugeConfig || defaultGaugeConfig;
                 let newLeadershipScore = state.leadershipScore + config.gainPerTask;
-                
-                // Daily Bonus Logic
                 const today = getTodayString();
                 const todayActionsCount = newActions.filter(a => a.date === today).length;
-                if (todayActionsCount === config.bonusThreshold) {
-                    newLeadershipScore += config.bonusAmount;
-                }
-
+                if (todayActionsCount === config.bonusThreshold) { newLeadershipScore += config.bonusAmount; }
                 newLeadershipScore = Math.min(30, newLeadershipScore);
-
-                const newState = {
-                    ...state,
-                    xp: state.xp + totalGain,
-                    leadershipScore: newLeadershipScore,
-                    activeGoals: newActiveGoals,
-                    actions: newActions,
-                    showConfetti: isComplete,
-                    goalValidation: { ...state.goalValidation, isOpen: false }
-                };
-
+                const newState = { ...state, xp: state.xp + totalGain, leadershipScore: newLeadershipScore, activeGoals: newActiveGoals, actions: newActions, showConfetti: isComplete, goalValidation: { ...state.goalValidation, isOpen: false } };
                 setState(newState);
                 saveToCloud(true, newState);
                 if (isComplete) setTimeout(() => setState(prev => ({ ...prev, showConfetti: false })), 2500);
@@ -852,7 +711,96 @@
 
             const logout = () => setState(prev => ({ ...prev, currentView: 'selection', pinInput: '' }));
 
+            // --- NOUVELLE FONCTION: Sauvegarde de la Config Firebase ---
+            const saveFirebaseConfig = () => {
+                try {
+                    // Nettoyage basique
+                    let cleanInput = configInput.trim();
+                    // Si l'utilisateur a copié tout le "const firebaseConfig = { ... }", on essaie d'extraire juste l'objet
+                    if (cleanInput.includes("firebaseConfig")) {
+                        const match = cleanInput.match(/{[\s\S]*}/);
+                        if (match) cleanInput = match[0];
+                    }
+                    
+                    // On essaie de corriger les clés non citées (ex: apiKey: "..." -> "apiKey": "...")
+                    // Ceci est une regex simpliste, l'idéal est de coller du JSON valide ou l'objet JS
+                    // Pour simplifier, on assume que l'utilisateur colle un objet JS valide ou un JSON
+                    // Si c'est un objet JS (pas de quotes sur les clés), JSON.parse va échouer.
+                    // On va utiliser une astuce avec Function pour parser l'objet JS si JSON.parse échoue
+                    let configObj;
+                    try {
+                        configObj = JSON.parse(cleanInput);
+                    } catch (e) {
+                         // Fallback pour objet JS
+                         configObj = new Function(`return ${cleanInput}`)();
+                    }
+
+                    if (!configObj || !configObj.apiKey) {
+                        setConfigError("Configuration invalide. Assurez-vous d'avoir 'apiKey'.");
+                        return;
+                    }
+
+                    safeStorage.set('app_firebase_config_v1', JSON.stringify(configObj));
+                    window.location.reload(); // Recharger pour appliquer la config
+                } catch (e) {
+                    setConfigError("Erreur de format. Collez l'objet de configuration complet.");
+                }
+            };
+
+            const resetFirebaseConfig = () => {
+                if (confirm("Voulez-vous vraiment déconnecter la base de données ?")) {
+                    safeStorage.remove('app_firebase_config_v1');
+                    window.location.reload();
+                }
+            };
+
             // --- RENDUS ---
+
+            const renderSetupFirebase = () => (
+                <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center p-6 text-white relative animate-fade-in">
+                    <div className="w-full max-w-md bg-slate-800 p-8 rounded-2xl shadow-2xl border border-slate-700">
+                        <div className="flex justify-center mb-6">
+                            <div className="bg-indigo-500 p-4 rounded-full shadow-lg shadow-indigo-500/50">
+                                <Database className="w-8 h-8 text-white" />
+                            </div>
+                        </div>
+                        <h1 className="text-2xl font-bold text-center mb-2">Connexion Base de Données</h1>
+                        <p className="text-slate-400 text-sm text-center mb-6">
+                            Collez ici votre configuration Firebase pour synchroniser l'application entre vos appareils.
+                        </p>
+                        
+                        <div className="space-y-4">
+                            <div>
+                                <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Configuration JSON / JavaScript</label>
+                                <textarea 
+                                    value={configInput}
+                                    onChange={(e) => { setConfigInput(e.target.value); setConfigError(''); }}
+                                    className="w-full h-40 bg-slate-900 border border-slate-600 rounded-xl p-3 text-xs font-mono text-slate-300 focus:ring-2 focus:ring-indigo-500 outline-none resize-none"
+                                    placeholder={`{
+  "apiKey": "...",
+  "authDomain": "...",
+  "projectId": "..."
+}`}
+                                />
+                                {configError && <p className="text-red-400 text-xs mt-2 flex items-center gap-1"><AlertTriangle className="w-3 h-3"/> {configError}</p>}
+                            </div>
+                            
+                            <button 
+                                onClick={saveFirebaseConfig}
+                                className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-3 rounded-xl shadow-lg transition active:scale-95 flex items-center justify-center gap-2"
+                            >
+                                <Save className="w-4 h-4" /> Sauvegarder & Connecter
+                            </button>
+                            
+                            <div className="text-center mt-4">
+                                <button onClick={() => setView('selection')} className="text-xs text-slate-500 hover:text-white underline">
+                                    Utiliser en mode hors ligne (Données non partagées)
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
             
             const renderSelection = () => (
                 <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center p-6 text-white relative">
@@ -1050,260 +998,80 @@
                             <div className="fixed inset-0 z-50 bg-slate-900/80 backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in" onClick={() => setState(prev => ({...prev, showSettings: false}))}>
                                 <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl overflow-hidden" onClick={e => e.stopPropagation()}>
                                     <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-800 text-white">
-                                        <h3 className="font-bold text-lg">Paramètres Jauge</h3>
+                                        <h3 className="font-bold text-lg">Paramètres</h3>
                                         <button onClick={() => setState(prev => ({...prev, showSettings: false}))}><X className="w-5 h-5" /></button>
                                     </div>
-                                    <div className="p-6 space-y-6">
-                                        <div>
-                                            <label className="block text-sm font-bold text-slate-700 mb-2">Multiplicateur de plancher</label>
-                                            <div className="flex items-center gap-2">
-                                                <input type="number" step="0.5" value={config.floorMultiplier} onChange={(e) => updateGaugeConfig('floorMultiplier', e.target.value)} className="w-20 p-2 border rounded-lg text-center font-bold" />
-                                                <span className="text-sm text-slate-500">x Niveau</span>
-                                            </div>
-                                            <p className="text-xs text-slate-400 mt-1">Le score de leadership ne descendra jamais en dessous du (Niveau actuel x ce chiffre). Exemple: Niveau 5 avec x1 = Minimum 5.</p>
-                                        </div>
+                                    <div className="p-6 space-y-6 overflow-y-auto max-h-[70vh]">
                                         
-                                        <div className="grid grid-cols-2 gap-4">
-                                            <div>
-                                                <label className="block text-sm font-bold text-slate-700 mb-2">Perte journalière</label>
-                                                <input type="number" value={config.decayPerDay} onChange={(e) => updateGaugeConfig('decayPerDay', e.target.value)} className="w-full p-2 border rounded-lg text-center font-bold" />
-                                                <p className="text-xs text-slate-400 mt-1">Points retirés automatiquement chaque matin si aucune action n'est faite.</p>
-                                            </div>
-                                            <div>
-                                                <label className="block text-sm font-bold text-slate-700 mb-2">Gain par tâche</label>
-                                                <input type="number" value={config.gainPerTask} onChange={(e) => updateGaugeConfig('gainPerTask', e.target.value)} className="w-full p-2 border rounded-lg text-center font-bold" />
-                                                <p className="text-xs text-slate-400 mt-1">Points ajoutés à la jauge pour chaque mission ou action libre validée.</p>
-                                            </div>
+                                        {/* SECTION FIREBASE CONFIG */}
+                                        <div className="bg-slate-50 border border-indigo-100 rounded-xl p-4">
+                                            <h4 className="font-bold text-indigo-900 mb-2 flex items-center gap-2">
+                                                <Database className="w-4 h-4" /> Base de Données
+                                            </h4>
+                                            {isConfigured ? (
+                                                <div className="space-y-3">
+                                                    <div className="flex items-center gap-2 text-green-700 bg-green-50 p-2 rounded-lg text-xs font-bold">
+                                                        <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
+                                                        Connecté à Firebase
+                                                    </div>
+                                                    <button onClick={resetFirebaseConfig} className="w-full flex items-center justify-center gap-2 bg-red-100 text-red-600 hover:bg-red-200 py-2 rounded-lg text-xs font-bold transition">
+                                                        <LogOut className="w-3 h-3" /> Déconnecter la BDD
+                                                    </button>
+                                                </div>
+                                            ) : (
+                                                <div className="space-y-3">
+                                                    <div className="flex items-center gap-2 text-orange-700 bg-orange-50 p-2 rounded-lg text-xs font-bold">
+                                                        <WifiOff className="w-3 h-3" /> Mode Hors Ligne
+                                                    </div>
+                                                    <button onClick={() => { setState(prev => ({...prev, showSettings: false, currentView: 'setup_firebase'})); }} className="w-full bg-indigo-600 text-white hover:bg-indigo-700 py-2 rounded-lg text-xs font-bold">
+                                                        Connecter Firebase maintenant
+                                                    </button>
+                                                </div>
+                                            )}
                                         </div>
 
-                                        <div className="border-t pt-4">
-                                            <h4 className="font-bold text-indigo-600 mb-3 flex items-center gap-2"><Flame className="w-4 h-4" /> Bonus Combo Quotidien</h4>
-                                            <div className="grid grid-cols-2 gap-4">
+                                        <div className="border-t pt-2">
+                                            <h4 className="font-bold text-slate-800 mb-3">Réglages Jauge</h4>
+                                            <div className="space-y-4">
                                                 <div>
-                                                    <label className="block text-xs font-bold text-slate-500 mb-1 uppercase">Objectif (tâches/jour)</label>
-                                                    <input type="number" value={config.bonusThreshold} onChange={(e) => updateGaugeConfig('bonusThreshold', e.target.value)} className="w-full p-2 border rounded-lg text-center font-bold" />
-                                                    <p className="text-xs text-slate-400 mt-1">Nombre d'actions nécessaires le même jour pour déclencher le bonus.</p>
+                                                    <label className="block text-sm font-bold text-slate-700 mb-2">Multiplicateur de plancher</label>
+                                                    <div className="flex items-center gap-2">
+                                                        <input type="number" step="0.5" value={config.floorMultiplier} onChange={(e) => updateGaugeConfig('floorMultiplier', e.target.value)} className="w-20 p-2 border rounded-lg text-center font-bold" />
+                                                        <span className="text-sm text-slate-500">x Niveau</span>
+                                                    </div>
+                                                    <p className="text-xs text-slate-400 mt-1">Le score de leadership ne descendra jamais en dessous du (Niveau actuel x ce chiffre). Exemple: Niveau 5 avec x1 = Minimum 5.</p>
                                                 </div>
-                                                <div>
-                                                    <label className="block text-xs font-bold text-slate-500 mb-1 uppercase">Points Bonus</label>
-                                                    <input type="number" value={config.bonusAmount} onChange={(e) => updateGaugeConfig('bonusAmount', e.target.value)} className="w-full p-2 border rounded-lg text-center font-bold" />
-                                                    <p className="text-xs text-slate-400 mt-1">Points extra offerts quand l'objectif journalier est atteint.</p>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        )}
-                    </div>
-                );
-            };
-
-            const renderCoachee = () => {
-                const progressPercent = Math.min(100, ((state.xp - currentLevel.xp) / (nextLevel.xp - currentLevel.xp)) * 100);
-                const config = state.gaugeConfig || defaultGaugeConfig;
-                const minScore = currentLevel.level * config.floorMultiplier;
-
-                return (
-                    <div className="bg-slate-50 font-sans text-slate-800 pb-10 relative overflow-x-hidden animate-fade-in min-h-screen">
-                        <StatusIndicator status={state.connectionStatus} />
-                        
-                        {/* Header */}
-                        <header className="bg-indigo-600 text-white p-6 rounded-b-3xl shadow-lg relative overflow-hidden pb-12">
-                            <div className="absolute top-0 right-0 w-32 h-32 bg-white opacity-10 rounded-full -mr-10 -mt-10"></div>
-                            <button onClick={logout} className="absolute top-4 right-4 z-20 opacity-50 hover:opacity-100 p-2"><User className="w-5 h-5" /></button>
-                            <div className="flex justify-between items-start mb-4 relative z-10">
-                                <div>
-                                    <h1 className="text-xl font-bold opacity-90">Bonjour, Héroïne !</h1>
-                                    <div className="flex items-center gap-2 mt-1">
-                                        <span className="text-3xl font-bold text-yellow-300">Niveau {currentLevel.level}</span>
-                                        <span className="text-indigo-200 text-sm font-medium border border-indigo-400 px-2 py-0.5 rounded-full">{currentLevel.title}</span>
-                                        <button onClick={() => setState(prev => ({...prev, showLevelGrid: true}))} className="text-indigo-200 hover:text-white transition p-1 rounded-full hover:bg-indigo-500/30">
-                                            <Info className="w-4 h-4" />
-                                        </button>
-                                    </div>
-                                </div>
-                                <div className="flex flex-col items-end mr-8">
-                                    <div className="flex items-center gap-1 bg-indigo-800 bg-opacity-50 px-3 py-1 rounded-full border border-indigo-500">
-                                        <Flame className="text-orange-400 w-4 h-4 fill-orange-400" />
-                                        <span className="font-bold text-orange-100 text-sm">{state.streak} j</span>
-                                    </div>
-                                </div>
-                            </div>
-                            <div className="relative z-10">
-                                <div className="flex justify-between text-xs mb-1 text-indigo-200"><span>XP: {state.xp}</span><span>Objectif: ??? ({nextLevel.xp} XP)</span></div>
-                                <div className="w-full bg-indigo-900 rounded-full h-3 overflow-hidden shadow-inner">
-                                    <div className="bg-gradient-to-r from-yellow-400 to-yellow-200 h-full rounded-full transition-all duration-1000" style={{ width: `${progressPercent}%` }}></div>
-                                </div>
-                            </div>
-                        </header>
-
-                        <main className="p-4 space-y-8 max-w-md mx-auto -mt-8 relative z-20">
-                            
-                            {/* Jauge Leadership */}
-                            <div className="bg-white rounded-2xl shadow-lg border border-slate-100 p-4 pt-6">
-                                <LeadershipGauge score={state.leadershipScore} minScore={minScore} />
-                            </div>
-
-                            {/* Mission Hebdo - LISTE */}
-                            <div>
-                                <h2 className="text-xs uppercase tracking-wider font-bold text-slate-400 flex items-center gap-2 mb-3 px-1"><Award className="w-4 h-4" /> Missions en cours</h2>
-                                {state.activeGoals.length === 0 ? (
-                                    <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-8 text-center text-slate-400">
-                                        <p>Aucune mission active.</p>
-                                        <p className="text-xs mt-1">Attends les instructions de ton mentor !</p>
-                                    </div>
-                                ) : (
-                                    <div className="space-y-4">
-                                        {state.activeGoals.map(goal => {
-                                            const isComplete = goal.progress >= goal.target;
-                                            return (
-                                                <div key={goal.id} className="bg-white rounded-2xl shadow-sm border border-slate-100 p-5 relative overflow-hidden group">
-                                                    <div className="absolute top-0 right-0 w-16 h-16 bg-purple-50 rounded-bl-full -mr-4 -mt-4 opacity-50"></div>
-                                                    <div className="relative z-10">
-                                                        <div className="flex justify-between items-start mb-2">
-                                                            <h3 className="text-lg font-bold text-slate-800 leading-tight">{goal.title}</h3>
-                                                            {isComplete && <Check className="w-5 h-5 text-green-500 stroke-[3]" />}
-                                                        </div>
-                                                        <p className="text-slate-600 text-sm mb-4">{goal.description}</p>
-                                                        
-                                                        {isComplete ? (
-                                                            <div className="bg-green-50 border border-green-200 rounded-lg p-3 flex items-center gap-3">
-                                                                <div className="bg-green-100 text-green-600 rounded-full p-1"><Check className="w-4 h-4" /></div>
-                                                                <span className="text-sm font-bold text-green-800">Mission accomplie !</span>
-                                                            </div>
-                                                        ) : (
-                                                            <div className="flex items-center justify-between gap-4">
-                                                                <div className="flex-1 flex gap-1 h-3">
-                                                                    {Array.from({length: Math.min(goal.target, 20)}).map((_, i) => (
-                                                                        <div key={i} className={`h-full flex-1 rounded-full transition-all duration-300 ${i < goal.progress ? 'bg-purple-500' : 'bg-slate-200'}`}></div>
-                                                                    ))}
-                                                                </div>
-                                                                <button 
-                                                                    onClick={() => openGoalValidation(goal.id)}
-                                                                    disabled={isComplete}
-                                                                    className="bg-purple-600 hover:bg-purple-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white w-10 h-10 rounded-full flex items-center justify-center shadow-md active:scale-95 transition flex-shrink-0"
-                                                                >
-                                                                    <Plus className="w-5 h-5" />
-                                                                </button>
-                                                            </div>
-                                                        )}
-                                                        {!isComplete && (
-                                                            <div className="text-right mt-1">
-                                                                <span className="text-[10px] text-purple-400 font-medium">{goal.progress} / {goal.target}</span>
-                                                            </div>
-                                                        )}
+                                                
+                                                <div className="grid grid-cols-2 gap-4">
+                                                    <div>
+                                                        <label className="block text-sm font-bold text-slate-700 mb-2">Perte journalière</label>
+                                                        <input type="number" value={config.decayPerDay} onChange={(e) => updateGaugeConfig('decayPerDay', e.target.value)} className="w-full p-2 border rounded-lg text-center font-bold" />
+                                                        <p className="text-xs text-slate-400 mt-1">Points retirés automatiquement chaque matin si aucune action n'est faite.</p>
+                                                    </div>
+                                                    <div>
+                                                        <label className="block text-sm font-bold text-slate-700 mb-2">Gain par tâche</label>
+                                                        <input type="number" value={config.gainPerTask} onChange={(e) => updateGaugeConfig('gainPerTask', e.target.value)} className="w-full p-2 border rounded-lg text-center font-bold" />
+                                                        <p className="text-xs text-slate-400 mt-1">Points ajoutés à la jauge pour chaque mission ou action libre validée.</p>
                                                     </div>
                                                 </div>
-                                            );
-                                        })}
-                                    </div>
-                                )}
-                            </div>
 
-                            {/* Graphique Pulse */}
-                            <div>
-                                <h2 className="font-bold text-lg text-slate-800 mb-2">Activité Mensuelle</h2>
-                                <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-4">
-                                    <SimpleChart actions={state.actions} />
-                                </div>
-                            </div>
-
-                            {/* Journal */}
-                            <div>
-                                <h2 className="font-bold text-lg text-slate-800 mb-4">Derniers exploits</h2>
-                                <div className="space-y-3">
-                                    {state.actions.length === 0 ? (
-                                        <div className="text-center text-slate-400 py-6 bg-white rounded-xl border border-dashed border-slate-200"><p className="text-sm">Ton aventure commence ici !</p></div>
-                                    ) : (
-                                        state.actions.slice(0, 3).map(action => (
-                                            <div key={action.id} className="bg-white p-4 rounded-xl shadow-sm border border-slate-100 flex items-center gap-4">
-                                                <div className="bg-slate-50 w-12 h-12 rounded-full flex items-center justify-center text-2xl shadow-inner flex-shrink-0">{getFeelingEmoji(action.feeling)}</div>
-                                                <div className="flex-1 min-w-0">
-                                                    <h4 className="font-semibold text-slate-800 leading-tight truncate">{action.title}</h4>
-                                                    <div className="flex items-center gap-2 mt-1">
-                                                        <span className="text-xs text-slate-400">{formatDate(action.date)}</span>
-                                                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${getDiscomfortClass(action.discomfort)}`}>Inc. {action.discomfort}</span>
-                                                    </div>
-                                                </div>
-                                                <div className="text-right flex-shrink-0"><span className="block font-bold text-indigo-600">+{action.xp}</span></div>
-                                            </div>
-                                        ))
-                                    )}
-                                </div>
-                            </div>
-
-                            {/* Bilan Hebdo */}
-                            <div className="bg-white rounded-2xl shadow-sm p-6 text-center border border-slate-100">
-                                <Trophy className="w-12 h-12 text-yellow-500 mx-auto mb-3" />
-                                <h2 className="text-xl font-bold mb-2">Bilan Hebdo</h2>
-                                <div className="flex justify-center gap-1 mb-6">{[1,2,3,4,5].map((i) => <Star key={i} className="w-6 h-6 text-yellow-400 fill-yellow-400" />)}</div>
-                                <div className="bg-indigo-50 p-4 rounded-xl mb-4">
-                                    <div className="grid grid-cols-2 gap-4">
-                                        <div><span className="block text-xl font-bold text-slate-800">{state.actions.length}</span><span className="text-[10px] uppercase text-slate-400 font-bold">Actions</span></div>
-                                        <div>
-                                            <span className="block text-xl font-bold text-slate-800">{(state.actions.reduce((acc, curr) => acc + curr.discomfort, 0) / (state.actions.length || 1)).toFixed(1)}</span>
-                                            <span className="text-[10px] uppercase text-slate-400 font-bold">Moy. Inc.</span>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </main>
-
-                        {/* Modale Validation Défi */}
-                        {state.goalValidation.isOpen && (
-                            <ActionModal 
-                                title="Valider une répétition"
-                                subtitle="Raconte brièvement ce que tu as fait pour ce défi."
-                                contextValue={state.goalValidation.context}
-                                onContextChange={(val) => updateGoalValidation('context', val)}
-                                discomfortValue={state.goalValidation.discomfort}
-                                onDiscomfortChange={(val) => updateGoalValidation('discomfort', val)}
-                                feelingValue={state.goalValidation.feeling}
-                                onFeelingChange={(val) => updateGoalValidation('feeling', val)}
-                                onConfirm={confirmGoalIncrement}
-                                onCancel={closeGoalValidation}
-                                confirmText="Valider étape (+10 XP)"
-                            />
-                        )}
-
-                        {/* Modale Grille des Niveaux */}
-                        {state.showLevelGrid && (
-                            <div className="fixed inset-0 z-50 bg-slate-900/80 backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in" onClick={() => setState(prev => ({...prev, showLevelGrid: false}))}>
-                                <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl overflow-hidden max-h-[80vh] flex flex-col" onClick={e => e.stopPropagation()}>
-                                    <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-indigo-50">
-                                        <h3 className="font-bold text-lg text-indigo-900">Parcours d'évolution</h3>
-                                        <button onClick={() => setState(prev => ({...prev, showLevelGrid: false}))} className="p-1 rounded-full hover:bg-indigo-100 text-indigo-700">
-                                            <X className="w-5 h-5" />
-                                        </button>
-                                    </div>
-                                    <div className="overflow-y-auto p-4 space-y-2">
-                                        {LEVELS.map(l => {
-                                            const isCurrent = currentLevel.level === l.level;
-                                            const isPassed = currentLevel.level > l.level;
-                                            const isLocked = !isCurrent && !isPassed;
-
-                                            return (
-                                                <div key={l.level} className={`flex items-center justify-between p-3 rounded-xl border ${isCurrent ? 'bg-indigo-50 border-indigo-500 ring-1 ring-indigo-500' : 'bg-white border-slate-100'} ${isPassed ? 'opacity-60' : ''}`}>
-                                                    <div className="flex items-center gap-3">
-                                                        <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs flex-shrink-0 ${isCurrent ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-500'}`}>
-                                                            {l.level}
+                                                <div className="border-t pt-4">
+                                                    <h4 className="font-bold text-indigo-600 mb-3 flex items-center gap-2"><Flame className="w-4 h-4" /> Bonus Combo Quotidien</h4>
+                                                    <div className="grid grid-cols-2 gap-4">
+                                                        <div>
+                                                            <label className="block text-xs font-bold text-slate-500 mb-1 uppercase">Objectif (tâches/jour)</label>
+                                                            <input type="number" value={config.bonusThreshold} onChange={(e) => updateGaugeConfig('bonusThreshold', e.target.value)} className="w-full p-2 border rounded-lg text-center font-bold" />
+                                                            <p className="text-xs text-slate-400 mt-1">Nombre d'actions nécessaires le même jour pour déclencher le bonus.</p>
                                                         </div>
                                                         <div>
-                                                            <div className={`font-bold ${isCurrent ? 'text-indigo-900' : 'text-slate-700'}`}>
-                                                                {isLocked ? "???" : l.title}
-                                                            </div>
-                                                            <div className="text-[10px] text-slate-500 font-medium leading-tight mt-0.5">
-                                                                {isLocked ? "Continue tes efforts pour dévoiler ce rang..." : l.description}
-                                                            </div>
+                                                            <label className="block text-xs font-bold text-slate-500 mb-1 uppercase">Points Bonus</label>
+                                                            <input type="number" value={config.bonusAmount} onChange={(e) => updateGaugeConfig('bonusAmount', e.target.value)} className="w-full p-2 border rounded-lg text-center font-bold" />
+                                                            <p className="text-xs text-slate-400 mt-1">Points extra offerts quand l'objectif journalier est atteint.</p>
                                                         </div>
                                                     </div>
-                                                    <div className="font-mono font-bold text-slate-400 text-xs ml-2">
-                                                        {l.xp}
-                                                    </div>
                                                 </div>
-                                            );
-                                        })}
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -1323,6 +1091,7 @@
                             </div>
                         </div>
                     )}
+                    {state.currentView === 'setup_firebase' && renderSetupFirebase()}
                     {state.currentView === 'selection' && renderSelection()}
                     {state.currentView === 'login' && renderLogin()}
                     {state.currentView === 'mentor' && renderMentor()}
