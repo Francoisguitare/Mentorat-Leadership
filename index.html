@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-    <title>L'Audacieuse - Suivi Mentorat</title>
+    <title>Leadership</title>
     <!-- Favicon -->
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🦁</text></svg>">
     
@@ -67,7 +67,7 @@
         import { 
             Zap, Lock, ArrowLeft, Delete, Award, Edit3, Check, 
             Trophy, Star, User, Flame, TrendingUp, Plus, Calendar,
-            X, BarChart3, Trash2, MessageSquare, Archive, MoreHorizontal, Info
+            X, BarChart3, Trash2, MessageSquare, Archive, MoreHorizontal, Info, Gauge as GaugeIcon
         } from 'lucide-react';
 
         // --- CONFIGURATION ---
@@ -164,6 +164,8 @@
         const defaultState = {
             xp: 0,
             streak: 0,
+            leadershipScore: 0, // 0-30
+            lastActivityDate: getTodayString(),
             actions: [],
             // On remplace weeklyGoal par un tableau
             activeGoals: [], 
@@ -195,6 +197,85 @@
             return (
                 <div className="fixed top-2 right-2 z-50 flex items-center gap-1 bg-white/50 backdrop-blur px-2 py-1 rounded-full text-[10px]">
                     <div className={`w-2 h-2 rounded-full ${colorClass} ${pulse}`}></div>
+                </div>
+            );
+        };
+
+        const LeadershipGauge = ({ score, minScore }) => {
+            // Gauge math
+            // 0 to 30 mapped to 0 to 180 degrees (top half circle)
+            // But visually lets do a 240 deg arc? No, simpler 180 semi circle looks cleaner for dashboard.
+            
+            const radius = 80;
+            const stroke = 15;
+            const normalizedScore = Math.min(Math.max(score, 0), 30);
+            const angle = (normalizedScore / 30) * 180;
+            
+            // Zones: 0-5 (Red/Grey), 6-15 (Blue), 15-25 (Purple), 26-30 (Gold)
+            // Angles: 0-30deg, 30-90deg, 90-150deg, 150-180deg
+            
+            // Text logic
+            let label = "Zéro Leadership";
+            let color = "text-slate-400";
+            if (score > 5) { label = "Début de Leadership"; color = "text-indigo-500"; }
+            if (score > 15) { label = "Leadership Affirmé"; color = "text-purple-600"; }
+            if (score > 25) { label = "Leader"; color = "text-yellow-500"; }
+
+            // Needle coordinates
+            const needleLen = radius - 10;
+            const needleAngleRad = (angle - 180) * (Math.PI / 180); // SVG coordinates, 0 is 3 o'clock. We want 0 to be 9 o'clock (-180)
+            const x = 100 + needleLen * Math.cos(needleAngleRad);
+            const y = 100 + needleLen * Math.sin(needleAngleRad);
+
+            return (
+                <div className="flex flex-col items-center justify-center -mt-6">
+                    <div className="relative w-[200px] h-[110px] overflow-hidden">
+                        <svg viewBox="0 0 200 110" className="w-full h-full">
+                            <defs>
+                                <linearGradient id="grad1" x1="0%" y1="0%" x2="100%" y2="0%">
+                                    <stop offset="0%" style={{stopColor:"#94a3b8", stopOpacity:1}} />
+                                    <stop offset="20%" style={{stopColor:"#64748b", stopOpacity:1}} />
+                                    <stop offset="50%" style={{stopColor:"#6366f1", stopOpacity:1}} />
+                                    <stop offset="85%" style={{stopColor:"#a855f7", stopOpacity:1}} />
+                                    <stop offset="100%" style={{stopColor:"#eab308", stopOpacity:1}} />
+                                </linearGradient>
+                            </defs>
+                            
+                            {/* Background Arc */}
+                            <path d="M 20 100 A 80 80 0 0 1 180 100" fill="none" stroke="#e2e8f0" strokeWidth={stroke} strokeLinecap="round" />
+                            
+                            {/* Colored Zones (Background hints) */}
+                            {/* Zone 1 (0-5) */}
+                            <path d="M 20 100 A 80 80 0 0 1 46 56" fill="none" stroke="#cbd5e1" strokeWidth={stroke} strokeLinecap="round" opacity="0.3" />
+                            
+                            {/* Score Arc */}
+                            {/* Not easy to do dynamic arc path simply in React without d3, using a masked circle or just needle is easier. 
+                                Let's stick to the needle and a gradient track.
+                            */}
+                            <path d="M 20 100 A 80 80 0 0 1 180 100" fill="none" stroke="url(#grad1)" strokeWidth={stroke} strokeLinecap="round" />
+                            
+                            {/* Needle */}
+                            <line x1="100" y1="100" x2={x} y2={y} stroke="#1e293b" strokeWidth="4" strokeLinecap="round" />
+                            <circle cx="100" cy="100" r="6" fill="#1e293b" />
+                            
+                            {/* Min Floor Marker */}
+                            {minScore > 0 && (
+                                <g transform={`rotate(${(minScore/30)*180 - 180}, 100, 100)`}>
+                                    <line x1="100" y1="20" x2="100" y2="35" stroke="white" strokeWidth="2" />
+                                    <polygon points="100,38 96,32 104,32" fill="white" />
+                                </g>
+                            )}
+                        </svg>
+                    </div>
+                    <div className="text-center -mt-2">
+                        <div className="text-2xl font-black text-slate-800">{Math.floor(score)}<span className="text-sm text-slate-400 font-normal">/30</span></div>
+                        <div className={`text-xs font-bold uppercase tracking-wider ${color}`}>{label}</div>
+                    </div>
+                    {minScore > 0 && (
+                        <div className="text-[10px] text-slate-400 mt-1 flex items-center gap-1">
+                            <Lock className="w-3 h-3" /> Min garanti: {minScore}
+                        </div>
+                    )}
                 </div>
             );
         };
@@ -332,10 +413,52 @@
                 window.scrollTo(0, 0);
             }, [state.currentView]);
 
+            // --- LOGIQUE DECAY LEADERSHIP ---
+            const applyLeadershipDecay = (data) => {
+                const today = getTodayString();
+                const lastDate = data.lastActivityDate || today;
+                
+                // If initializing for the first time or data missing
+                let score = data.leadershipScore !== undefined ? data.leadershipScore : 0;
+                
+                // If it's a new day, apply decay
+                if (lastDate !== today) {
+                    const diffTime = Math.abs(new Date(today) - new Date(lastDate));
+                    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)); 
+                    
+                    if (diffDays > 0) {
+                        // Calculate floor based on level
+                        const currentXp = data.xp || 0;
+                        const { current } = getLevelInfo(currentXp);
+                        const floor = current.level; // Min score is the level number
+                        
+                        // Decay score but respect floor
+                        // Logic: score - days passed. But cannot go below floor.
+                        // UNLESS score was already below floor (e.g. leveled up yesterday), then it stays put or jumps to floor?
+                        // Let's assume standard behavior: decay, then clamp to floor.
+                        
+                        let newScore = score - diffDays;
+                        score = Math.max(newScore, floor);
+                    }
+                }
+
+                // Auto-bump if current level floor is higher than score (e.g. just leveled up)
+                const currentXp = data.xp || 0;
+                const { current } = getLevelInfo(currentXp);
+                if (score < current.level) {
+                    score = current.level;
+                }
+
+                return {
+                    ...data,
+                    leadershipScore: score,
+                    lastActivityDate: today
+                };
+            };
+
             useEffect(() => {
                 const processData = (data) => {
                     let activeGoals = data.activeGoals || [];
-                    // MIGRATION: Si pas d'activeGoals mais un weeklyGoal existe, on le migre
                     if (activeGoals.length === 0 && data.weeklyGoal && data.weeklyGoal.title !== "En attente du Mentor...") {
                         activeGoals.push({
                             ...data.weeklyGoal,
@@ -343,8 +466,11 @@
                         });
                     }
 
+                    // Apply Leadership Decay Logic
+                    const decayProcessedData = applyLeadershipDecay(data);
+
                     return {
-                        ...data,
+                        ...decayProcessedData,
                         activeGoals: activeGoals,
                         archivedGoals: data.archivedGoals || []
                     };
@@ -356,6 +482,11 @@
                         try {
                             const parsed = JSON.parse(localData);
                             const processed = processData(parsed);
+                            // If data was modified by decay, save it back
+                            if (processed.leadershipScore !== parsed.leadershipScore || processed.lastActivityDate !== parsed.lastActivityDate) {
+                                localStorage.setItem(`audacieuse_${appId}`, JSON.stringify(processed));
+                            }
+                            
                             setState(prev => ({
                                 ...prev,
                                 ...processed,
@@ -365,7 +496,9 @@
                             }));
                         } catch (e) { console.error(e); }
                     } else {
-                        setState(prev => ({ ...prev, connectionStatus: 'connected' }));
+                        // Initialisation avec vérification du plancher (level 1 min)
+                        const processed = applyLeadershipDecay(defaultState);
+                        setState(prev => ({ ...prev, ...processed, connectionStatus: 'connected' }));
                     }
                     return;
                 }
@@ -379,6 +512,8 @@
                             if (docSnap.exists()) {
                                 const data = docSnap.data();
                                 const processed = processData(data);
+                                // Note: We don't save back immediately to avoid loops/writes on every load, 
+                                // but we update local state. The next user action will save the decayed state.
                                 setState(prev => ({
                                     ...prev,
                                     ...processed,
@@ -409,6 +544,8 @@
                 const dataToSave = {
                     xp: currentState.xp,
                     streak: currentState.streak,
+                    leadershipScore: currentState.leadershipScore,
+                    lastActivityDate: currentState.lastActivityDate,
                     actions: currentState.actions,
                     activeGoals: currentState.activeGoals,
                     archivedGoals: currentState.archivedGoals || []
@@ -574,10 +711,13 @@
                 };
                 const newActions = [newEntry, ...state.actions];
                 const newXp = state.xp + discomfortPoints;
+                const newLeadershipScore = Math.min(30, state.leadershipScore + 1); // +1 point for action
+                
                 const newState = {
                     ...state,
                     actions: newActions,
                     xp: newXp,
+                    leadershipScore: newLeadershipScore,
                     newAction: { title: '', discomfort: 5, feeling: 'neutral' },
                     activeTab: 'dashboard',
                     showConfetti: true
@@ -640,10 +780,13 @@
                 const newActiveGoals = state.activeGoals.map(g => 
                     g.id === targetId ? { ...g, progress: newProgress } : g
                 );
+                
+                const newLeadershipScore = Math.min(30, state.leadershipScore + 1); // +1 point for validation
 
                 const newState = {
                     ...state,
                     xp: state.xp + totalGain,
+                    leadershipScore: newLeadershipScore,
                     activeGoals: newActiveGoals,
                     actions: [goalAction, ...state.actions],
                     showConfetti: isComplete,
@@ -664,7 +807,7 @@
                     <StatusIndicator status={state.connectionStatus} />
                     <div className="z-10 w-full max-w-md space-y-8 text-center animate-fade-in">
                         <div className="mb-8">
-                            <h1 className="text-4xl font-bold mb-2 tracking-tight">L'Audacieuse</h1>
+                            <h1 className="text-4xl font-bold mb-2 tracking-tight">Leadership</h1>
                             <p className="text-indigo-300">Plateforme de croissance & leadership</p>
                         </div>
                         <div className="grid gap-4">
@@ -849,7 +992,7 @@
                         <StatusIndicator status={state.connectionStatus} />
                         
                         {/* Header */}
-                        <header className="bg-indigo-600 text-white p-6 rounded-b-3xl shadow-lg relative overflow-hidden">
+                        <header className="bg-indigo-600 text-white p-6 rounded-b-3xl shadow-lg relative overflow-hidden pb-12">
                             <div className="absolute top-0 right-0 w-32 h-32 bg-white opacity-10 rounded-full -mr-10 -mt-10"></div>
                             <button onClick={logout} className="absolute top-4 right-4 z-20 opacity-50 hover:opacity-100 p-2"><User className="w-5 h-5" /></button>
                             <div className="flex justify-between items-start mb-4 relative z-10">
@@ -878,8 +1021,13 @@
                             </div>
                         </header>
 
-                        <main className="p-4 space-y-8 max-w-md mx-auto">
+                        <main className="p-4 space-y-8 max-w-md mx-auto -mt-8 relative z-20">
                             
+                            {/* Jauge Leadership */}
+                            <div className="bg-white rounded-2xl shadow-lg border border-slate-100 p-4 pt-6">
+                                <LeadershipGauge score={state.leadershipScore} minScore={currentLevel.level} />
+                            </div>
+
                             {/* Mission Hebdo - LISTE */}
                             <div>
                                 <h2 className="text-xs uppercase tracking-wider font-bold text-slate-400 flex items-center gap-2 mb-3 px-1"><Award className="w-4 h-4" /> Missions en cours</h2>
