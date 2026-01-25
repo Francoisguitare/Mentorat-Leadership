@@ -170,14 +170,23 @@
             bonusAmount: 2
         };
 
+        // Données par défaut pour éviter l'écran blanc/vide sur les nouveaux appareils
+        const INITIAL_GOAL = {
+            id: 1,
+            title: "Bienvenue à bord !",
+            description: "Ceci est ta première mission. Valide-la pour tester l'application.",
+            target: 1,
+            progress: 0
+        };
+
         const defaultState = {
             xp: 0,
             streak: 0,
-            leadershipScore: 0, // 0-30
+            leadershipScore: 1, // Score de départ > 0
             gaugeConfig: defaultGaugeConfig,
             lastActivityDate: getTodayString(),
             actions: [],
-            activeGoals: [], 
+            activeGoals: [INITIAL_GOAL], // On initialise avec une mission
             archivedGoals: [],
             currentView: 'selection', 
             activeTab: 'dashboard',
@@ -497,6 +506,7 @@
                             }));
                         } catch (e) { console.error(e); }
                     } else {
+                        // SI pas de données locales, on utilise defaultState QUI CONTIENT UNE MISSION PAR DEFAUT
                         const processed = applyLeadershipDecay(defaultState);
                         setState(prev => ({ ...prev, ...processed, connectionStatus: 'connected' }));
                     }
