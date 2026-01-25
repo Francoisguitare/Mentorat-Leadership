@@ -1089,6 +1089,219 @@
                 );
             };
 
+            const renderCoachee = () => {
+                const progressPercent = Math.min(100, ((state.xp - currentLevel.xp) / (nextLevel.xp - currentLevel.xp)) * 100);
+                const config = state.gaugeConfig || defaultGaugeConfig;
+                const minScore = currentLevel.level * config.floorMultiplier;
+
+                return (
+                    <div className="bg-slate-50 font-sans text-slate-800 pb-10 relative overflow-x-hidden animate-fade-in min-h-screen">
+                        <StatusIndicator status={state.connectionStatus} />
+                        
+                        {/* Header */}
+                        <header className="bg-indigo-600 text-white p-6 rounded-b-3xl shadow-lg relative overflow-hidden pb-12">
+                            <div className="absolute top-0 right-0 w-32 h-32 bg-white opacity-10 rounded-full -mr-10 -mt-10"></div>
+                            <button onClick={logout} className="absolute top-4 right-4 z-20 opacity-50 hover:opacity-100 p-2"><User className="w-5 h-5" /></button>
+                            <div className="flex justify-between items-start mb-4 relative z-10">
+                                <div>
+                                    <h1 className="text-xl font-bold opacity-90">Bonjour, Héroïne !</h1>
+                                    <div className="flex items-center gap-2 mt-1">
+                                        <span className="text-3xl font-bold text-yellow-300">Niveau {currentLevel.level}</span>
+                                        <span className="text-indigo-200 text-sm font-medium border border-indigo-400 px-2 py-0.5 rounded-full">{currentLevel.title}</span>
+                                        <button onClick={() => setState(prev => ({...prev, showLevelGrid: true}))} className="text-indigo-200 hover:text-white transition p-1 rounded-full hover:bg-indigo-500/30">
+                                            <Info className="w-4 h-4" />
+                                        </button>
+                                    </div>
+                                </div>
+                                <div className="flex flex-col items-end mr-8">
+                                    <div className="flex items-center gap-1 bg-indigo-800 bg-opacity-50 px-3 py-1 rounded-full border border-indigo-500">
+                                        <Flame className="text-orange-400 w-4 h-4 fill-orange-400" />
+                                        <span className="font-bold text-orange-100 text-sm">{state.streak} j</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div className="relative z-10">
+                                <div className="flex justify-between text-xs mb-1 text-indigo-200"><span>XP: {state.xp}</span><span>Objectif: ??? ({nextLevel.xp} XP)</span></div>
+                                <div className="w-full bg-indigo-900 rounded-full h-3 overflow-hidden shadow-inner">
+                                    <div className="bg-gradient-to-r from-yellow-400 to-yellow-200 h-full rounded-full transition-all duration-1000" style={{ width: `${progressPercent}%` }}></div>
+                                </div>
+                            </div>
+                        </header>
+
+                        <main className="p-4 space-y-8 max-w-md mx-auto -mt-8 relative z-20">
+                            
+                            {/* Jauge Leadership */}
+                            <div className="bg-white rounded-2xl shadow-lg border border-slate-100 p-4 pt-6">
+                                <LeadershipGauge score={state.leadershipScore} minScore={minScore} />
+                            </div>
+
+                            {/* Mission Hebdo - LISTE */}
+                            <div>
+                                <h2 className="text-xs uppercase tracking-wider font-bold text-slate-400 flex items-center gap-2 mb-3 px-1"><Award className="w-4 h-4" /> Missions en cours</h2>
+                                {state.activeGoals.length === 0 ? (
+                                    <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-8 text-center text-slate-400">
+                                        <p>Aucune mission active.</p>
+                                        <p className="text-xs mt-1">Attends les instructions de ton mentor !</p>
+                                    </div>
+                                ) : (
+                                    <div className="space-y-4">
+                                        {state.activeGoals.map(goal => {
+                                            const isComplete = goal.progress >= goal.target;
+                                            return (
+                                                <div key={goal.id} className="bg-white rounded-2xl shadow-sm border border-slate-100 p-5 relative overflow-hidden group">
+                                                    <div className="absolute top-0 right-0 w-16 h-16 bg-purple-50 rounded-bl-full -mr-4 -mt-4 opacity-50"></div>
+                                                    <div className="relative z-10">
+                                                        <div className="flex justify-between items-start mb-2">
+                                                            <h3 className="text-lg font-bold text-slate-800 leading-tight">{goal.title}</h3>
+                                                            {isComplete && <Check className="w-5 h-5 text-green-500 stroke-[3]" />}
+                                                        </div>
+                                                        <p className="text-slate-600 text-sm mb-4">{goal.description}</p>
+                                                        
+                                                        {isComplete ? (
+                                                            <div className="bg-green-50 border border-green-200 rounded-lg p-3 flex items-center gap-3">
+                                                                <div className="bg-green-100 text-green-600 rounded-full p-1"><Check className="w-4 h-4" /></div>
+                                                                <span className="text-sm font-bold text-green-800">Mission accomplie !</span>
+                                                            </div>
+                                                        ) : (
+                                                            <div className="flex items-center justify-between gap-4">
+                                                                <div className="flex-1 flex gap-1 h-3">
+                                                                    {Array.from({length: Math.min(goal.target, 20)}).map((_, i) => (
+                                                                        <div key={i} className={`h-full flex-1 rounded-full transition-all duration-300 ${i < goal.progress ? 'bg-purple-500' : 'bg-slate-200'}`}></div>
+                                                                    ))}
+                                                                </div>
+                                                                <button 
+                                                                    onClick={() => openGoalValidation(goal.id)}
+                                                                    disabled={isComplete}
+                                                                    className="bg-purple-600 hover:bg-purple-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white w-10 h-10 rounded-full flex items-center justify-center shadow-md active:scale-95 transition flex-shrink-0"
+                                                                >
+                                                                    <Plus className="w-5 h-5" />
+                                                                </button>
+                                                            </div>
+                                                        )}
+                                                        {!isComplete && (
+                                                            <div className="text-right mt-1">
+                                                                <span className="text-[10px] text-purple-400 font-medium">{goal.progress} / {goal.target}</span>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Graphique Pulse */}
+                            <div>
+                                <h2 className="font-bold text-lg text-slate-800 mb-2">Activité Mensuelle</h2>
+                                <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-4">
+                                    <SimpleChart actions={state.actions} />
+                                </div>
+                            </div>
+
+                            {/* Journal */}
+                            <div>
+                                <h2 className="font-bold text-lg text-slate-800 mb-4">Derniers exploits</h2>
+                                <div className="space-y-3">
+                                    {state.actions.length === 0 ? (
+                                        <div className="text-center text-slate-400 py-6 bg-white rounded-xl border border-dashed border-slate-200"><p className="text-sm">Ton aventure commence ici !</p></div>
+                                    ) : (
+                                        state.actions.slice(0, 3).map(action => (
+                                            <div key={action.id} className="bg-white p-4 rounded-xl shadow-sm border border-slate-100 flex items-center gap-4">
+                                                <div className="bg-slate-50 w-12 h-12 rounded-full flex items-center justify-center text-2xl shadow-inner flex-shrink-0">{getFeelingEmoji(action.feeling)}</div>
+                                                <div className="flex-1 min-w-0">
+                                                    <h4 className="font-semibold text-slate-800 leading-tight truncate">{action.title}</h4>
+                                                    <div className="flex items-center gap-2 mt-1">
+                                                        <span className="text-xs text-slate-400">{formatDate(action.date)}</span>
+                                                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${getDiscomfortClass(action.discomfort)}`}>Inc. {action.discomfort}</span>
+                                                    </div>
+                                                </div>
+                                                <div className="text-right flex-shrink-0"><span className="block font-bold text-indigo-600">+{action.xp}</span></div>
+                                            </div>
+                                        ))
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* Bilan Hebdo */}
+                            <div className="bg-white rounded-2xl shadow-sm p-6 text-center border border-slate-100">
+                                <Trophy className="w-12 h-12 text-yellow-500 mx-auto mb-3" />
+                                <h2 className="text-xl font-bold mb-2">Bilan Hebdo</h2>
+                                <div className="flex justify-center gap-1 mb-6">{[1,2,3,4,5].map((i) => <Star key={i} className="w-6 h-6 text-yellow-400 fill-yellow-400" />)}</div>
+                                <div className="bg-indigo-50 p-4 rounded-xl mb-4">
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div><span className="block text-xl font-bold text-slate-800">{state.actions.length}</span><span className="text-[10px] uppercase text-slate-400 font-bold">Actions</span></div>
+                                        <div>
+                                            <span className="block text-xl font-bold text-slate-800">{(state.actions.reduce((acc, curr) => acc + curr.discomfort, 0) / (state.actions.length || 1)).toFixed(1)}</span>
+                                            <span className="text-[10px] uppercase text-slate-400 font-bold">Moy. Inc.</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </main>
+
+                        {/* Modale Validation Défi */}
+                        {state.goalValidation.isOpen && (
+                            <ActionModal 
+                                title="Valider une répétition"
+                                subtitle="Raconte brièvement ce que tu as fait pour ce défi."
+                                contextValue={state.goalValidation.context}
+                                onContextChange={(val) => updateGoalValidation('context', val)}
+                                discomfortValue={state.goalValidation.discomfort}
+                                onDiscomfortChange={(val) => updateGoalValidation('discomfort', val)}
+                                feelingValue={state.goalValidation.feeling}
+                                onFeelingChange={(val) => updateGoalValidation('feeling', val)}
+                                onConfirm={confirmGoalIncrement}
+                                onCancel={closeGoalValidation}
+                                confirmText="Valider étape (+10 XP)"
+                            />
+                        )}
+
+                        {/* Modale Grille des Niveaux */}
+                        {state.showLevelGrid && (
+                            <div className="fixed inset-0 z-50 bg-slate-900/80 backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in" onClick={() => setState(prev => ({...prev, showLevelGrid: false}))}>
+                                <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl overflow-hidden max-h-[80vh] flex flex-col" onClick={e => e.stopPropagation()}>
+                                    <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-indigo-50">
+                                        <h3 className="font-bold text-lg text-indigo-900">Parcours d'évolution</h3>
+                                        <button onClick={() => setState(prev => ({...prev, showLevelGrid: false}))} className="p-1 rounded-full hover:bg-indigo-100 text-indigo-700">
+                                            <X className="w-5 h-5" />
+                                        </button>
+                                    </div>
+                                    <div className="overflow-y-auto p-4 space-y-2">
+                                        {LEVELS.map(l => {
+                                            const isCurrent = currentLevel.level === l.level;
+                                            const isPassed = currentLevel.level > l.level;
+                                            const isLocked = !isCurrent && !isPassed;
+
+                                            return (
+                                                <div key={l.level} className={`flex items-center justify-between p-3 rounded-xl border ${isCurrent ? 'bg-indigo-50 border-indigo-500 ring-1 ring-indigo-500' : 'bg-white border-slate-100'} ${isPassed ? 'opacity-60' : ''}`}>
+                                                    <div className="flex items-center gap-3">
+                                                        <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs flex-shrink-0 ${isCurrent ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-500'}`}>
+                                                            {l.level}
+                                                        </div>
+                                                        <div>
+                                                            <div className={`font-bold ${isCurrent ? 'text-indigo-900' : 'text-slate-700'}`}>
+                                                                {isLocked ? "???" : l.title}
+                                                            </div>
+                                                            <div className="text-[10px] text-slate-500 font-medium leading-tight mt-0.5">
+                                                                {isLocked ? "Continue tes efforts pour dévoiler ce rang..." : l.description}
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                    <div className="font-mono font-bold text-slate-400 text-xs ml-2">
+                                                        {l.xp}
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                );
+            };
+
             return (
                 <>
                     {state.showConfetti && (
